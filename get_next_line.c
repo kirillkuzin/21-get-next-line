@@ -24,36 +24,40 @@ int		get_next_line(const int fd, char **line)
 	size_t	line_len;
 	size_t	buff_count;
 	size_t  i;
+	int     eof;
 
 	line_len = 0;
 	i = 0;
     sym = 1;
-	while (sym != '\n' && sym)
-	{
-		read(fd, &sym, 1);
-		line_len++;
-	}
+	while (sym != '\n' && read(fd, &sym, 1))
+		line_len++;x
+	if (sym != '\n')
+	    line_len++;
 	lseek(fd, -line_len, SEEK_CUR);
 	*line = (char*)malloc(sizeof(char) * line_len);
-	buff_count = line_len / BUFF_SIZE;
-	if (line_len % BUFF_SIZE > 0) buff_count++;
+	buff_count = (line_len - 1) / BUFF_SIZE;
+	if ((line_len - 1) % BUFF_SIZE > 0) buff_count++;
+	printf("%zu\n", line_len);
     while (buff_count > 0)
     {
-	    if (buff_count == 1)
+	    if (buff_count == 1 && (line_len - 1) % BUFF_SIZE > 0)
         {
-            read(fd, &line[0][i], (line_len) % BUFF_SIZE);
-            i += (line_len) % BUFF_SIZE;
+            read(fd, &line[0][i], (line_len - 1) % BUFF_SIZE);
+            i += (line_len - 1) % BUFF_SIZE;
         }
 	    else
         {
-            read(fd, &line[0][i], BUFF_SIZE);
+            eof = read(fd, &line[0][i], BUFF_SIZE);
             i += BUFF_SIZE;
 	    }
 	    buff_count--;
     }
-	printf("%s", line[0]);
-//    if (line[0][i - 1] == '\0') return 1;
-    return 0;
+//    line[0][line_len - 1] = '\0';
+    printf("%c", sym);
+    if (sym != '\0')
+        lseek(fd, 1, SEEK_CUR);
+    printf("%s", line[0]);
+    return (1);
 }
 
 int		main(int argc, char **argv)
