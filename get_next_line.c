@@ -5,96 +5,84 @@
 #include <string.h>
 #include "get_next_line.h"
 
-size_t      ft_strsizeof(char *str)
-{
-    return (sizeof(char) * strlen(str));
-}
-
-char        *ft_strrealloc(char *str, size_t new_memory_size)
+char        *ft_strrealloc(char *str, size_t needed_memory)
 {
     void    *str_cpy;
 
-    if (new_memory_size == 0)
+    if (needed_memory == 0)
         return (str);
     str_cpy = (char*)malloc(sizeof(char) * sizeof(str));
     strcpy(str_cpy, str);
     free(str);
-    str = (char*)malloc(sizeof(char) * new_memory_size);
+    str = (char*)malloc(sizeof(char) * (needed_memory + strlen(str_cpy) + 1));
     strcpy(str, str_cpy);
+    str[needed_memory + strlen(str_cpy)] = '\0';
     free(str_cpy);
     return (str);
 }
 
-size_t		scan_buff(char *buffer)
+int     check_res(char **line, char *res)
 {
-    size_t		i;
-
-    i = 0;
-    while (i < BUFF_SIZE && buffer[i])
+    static char     *new_line_pos = NULL;
+    char            *buffer;
+    
+    if (new_line_pos != NULL)
+        buffer = new_line_pos;
+    else
+        buffer = res;
+    if ((new_line_pos = strchr(buffer, '\n')))
     {
-        if (buffer[i] == '\n')
-            break ;
-        i++;
+        line[0] = (char*)malloc(sizeof(char) * (new_line_pos - buffer) + 1);
+        strncpy(line[0], buffer, new_line_pos - buffer);
+        line[0][new_line_pos - buffer] = '\0';
+        new_line_pos++;
+        printf("%d", 1);
+        return (1);
     }
-    return (i);
+    else
+    {
+        line[0] = (char*)malloc(sizeof(char) * strlen(buffer) + 1);
+        strncpy(line[0], buffer, strlen(buffer));
+        line[0][strlen(buffer)] = '\0';
+        printf("%d", 0);
+        return (0);
+    }
 }
 
 int         get_next_line(const int fd, char **line)
 {
-    char            buffer[BUFF_SIZE];
-    static char     prev_buffer[BUFF_SIZE];
-    static size_t   prev_line_len;
-    size_t          line_len;
-    size_t          tmp;
+    static char res[BUFF_SIZE];
+    char        buffer[BUFF_SIZE];
+    int         read_result;
+    char        *new_line_pos;
 
-    line_len = BUFF_SIZE;
-    if (strlen(prev_buffer) > 0)
+    if (fd < 0 || fd > MAX_FD)
+        return (-1);
+    if (line[0] != NULL)
+        free(line[0]);
+    line[0] = (char*)malloc(sizeof(char));
+    line[0][0] = '\0';
+    if (check_res(line, res))
+        return (1);
+    read_result = read(fd, buffer, BUFF_SIZE);
+    if (read_result == 0)
     {
-        tmp = prev_line_len;
-        prev_line_len = scan_buff(&prev_buffer[prev_line_len]);
-        line[0] = (char*)malloc(sizeof(char) * prev_line_len + 1);
-        line[0][prev_line_len] = '\0';
-        if (prev_line_len > 0)
-            strncpy(line[0], &prev_buffer[tmp], prev_line_len);
-        prev_line_len += tmp + 1;
-        if (prev_buffer[prev_line_len - 1] == '\n')
-        {
-            printf("%s\n", line[0]);
-            return (1);
-        }
-        prev_line_len = 0;
-        tmp = 1;
-        memset(prev_buffer, '\0', BUFF_SIZE);
-    }
-    while (line_len == BUFF_SIZE)
-    {
-        tmp = read(fd, buffer, BUFF_SIZE);
-        line_len = scan_buff(buffer);
-        if (line[0] == NULL)
-        {
-            line[0] = (char*)malloc(sizeof(char) * line_len + 1);
-            line[0][line_len] = '\0';
-            strncpy(line[0], buffer, line_len);
-        }
-        else
-        {
-            line[0] = ft_strrealloc(line[0], ft_strsizeof(line[0]) + line_len);
-            line[0][strlen(line[0]) + line_len] = '\0';
-            strncpy(&line[0][strlen(line[0])], buffer, line_len);
-        }
-        if (line_len != BUFF_SIZE)
-        {
-            if (buffer[line_len] == '\n')
-                line_len++;
-            if (line_len > 0)
-                strncpy(prev_buffer, &buffer[line_len], BUFF_SIZE - line_len);
-            prev_buffer[BUFF_SIZE - line_len] = '\0';
-        }
-        memset(buffer, '\0', BUFF_SIZE);
-    }
-    if (tmp == 0 && line_len == 0)
+        // if (strlen(res) > 0)
+        //     return (1);
         return (0);
-    printf("%s\n", line[0]);
+    }
+    while ((new_line_pos = strchr(buffer, '\n')) == NULL)
+    {
+        line[0] = ft_strrealloc(line[0], (size_t)read_result);
+        strncpy(&line[0][strlen(line[0])], buffer, read_result);
+        read_result = read(fd, buffer, BUFF_SIZE);
+        if (read_result == 0)
+            return (0);
+    }
+    line[0] = ft_strrealloc(line[0], (new_line_pos - buffer));
+    strncpy(&line[0][strlen(line[0])], buffer, new_line_pos - buffer);
+    strncpy(res, &buffer[new_line_pos - buffer + 1], read_result - (new_line_pos - buffer));
+    res[read_result - (new_line_pos - buffer) - 1] = '\0';
     return (1);
 }
 
@@ -107,17 +95,15 @@ int         get_next_line(const int fd, char **line)
 //     state = 1;
 //     fd = open(argv[1], O_RDONLY);
 //     line = (char**)malloc(sizeof(char*) * 100);
-//     get_next_line(fd, line);
+//     printf("\n%d", get_next_line(fd, line));
+//     printf("\n%s", *line);   
 //     line++;
-//     get_next_line(fd, line);
+//     printf("\n%d", get_next_line(fd, line));
+//     printf("\n%s", *line);
 //     line++;
-//     get_next_line(fd, line);
+//     printf("\n%d", get_next_line(fd, line));
+//     printf("\n%s", *line);
 //     line++;
-//     get_next_line(fd, line);
-//     // line++;
-//     // get_next_line(fd, line);
-//     // line++;
-//     // get_next_line(fd, line);
-//     close(fd);
-//     return (1);
+//     printf("\n%d", get_next_line(fd, line));
+//     printf("\n%s", *line);
 // }
